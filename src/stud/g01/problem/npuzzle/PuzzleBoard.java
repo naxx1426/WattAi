@@ -39,6 +39,9 @@ public class PuzzleBoard extends State {
         return new int[]{-1, -1}; // 理论上不会发生
     }
 
+    /**
+     * 打印棋盘的内容
+     */
     @Override
     public void draw() {
         int size = grid.length;
