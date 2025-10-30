@@ -13,6 +13,10 @@ import stud.g01.problem.npuzzle.PuzzleBoard;
 import java.util.ArrayList;
 //Fix Me   //Fix Me
 public class PuzzleFeeder extends EngineFeeder {
+
+    /**
+     * 获得当前问题对应的棋盘大小，初始棋盘和目标棋盘
+     */
     @Override
     public ArrayList<Problem> getProblems(ArrayList<String> problemLines) {
         // 创建一个最终要返回的问题列表
