@@ -32,7 +32,8 @@ public class PuzzleBoard extends State {
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
                 if (grid[i][j] == 0) {
-                    return new int[]{i, j};
+                    this.blankPosition = new int[]{i, j};
+                    return this.blankPosition;
                 }
             }
         }

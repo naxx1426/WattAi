@@ -8,6 +8,7 @@ import stud.problem.pathfinding.Direction;
 import stud.problem.pathfinding.Move;
 
 import java.util.Deque;
+import java.util.Iterator;
 
 public class NPuzzleProblem extends Problem {
     public NPuzzleProblem(State initialState, State goal) {
@@ -129,12 +130,41 @@ public class NPuzzleProblem extends Problem {
         }
     }
 
+
     /**
-     * !!!!!!!!!!!!!我没写，望诸位有空就写一下！！！！！！！！
-     * 按照指定的格式，可视化地展示解决方案的完整路径。
+     * ！！！！！！！！！！！！！！施工中by雷祥宁！！！！！！！！！！！！！
+     * 按照指定的格式，可视化地展示从初始状态到目标状态的解决方案路径。
+     * @param path 一个包含解决方案路径上所有节点的双端队列 (Deque)。
      */
     @Override
     public void showSolution(Deque<Node> path) {
+        if (path == null || path.isEmpty()) {
+            System.out.println("\n找不到解决办法");
+            return;
+        }
 
+        Iterator<Node> iterator = path.iterator();
+
+        Node startNode = iterator.next();
+        startNode.getState().draw();
+
+        int step = 1;
+        while (iterator.hasNext()) {
+            Node currentNode = iterator.next();
+            Action action = currentNode.getAction();
+
+            // 打印箭头
+            if (action != null) {
+                System.out.println("   ↓");
+                System.out.printf("   ↓-(#, %s)\n", action.toString());
+                System.out.println("   ↓");
+            }
+
+            // 打印动作执行后的棋盘状态
+            currentNode.getState().draw();
+        }
+
+        System.out.println("启发函数: " + "占位先" + "，解路径长度：" + (path.size() - 1)
+                + "，执行了" + "执行时间" + "，共生成了" + "占位" + "个结点，扩展了" + "占位" + "个结点");
     }
 }
