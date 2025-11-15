@@ -7,10 +7,14 @@ import core.solver.algorithm.heuristic.HeuristicType;
 import core.solver.algorithm.heuristic.Predictor;
 import core.solver.queue.EvaluationType;
 import core.solver.queue.Frontier;
+import core.solver.queue.Node;
 import stud.g01.problem.npuzzle.NPuzzleProblem;
 import stud.g01.problem.npuzzle.PuzzleBoard;
+import stud.queue.StackFrontier;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+
 //Fix Me   //Fix Me
 public class PuzzleFeeder extends EngineFeeder {
 
@@ -62,7 +66,12 @@ public class PuzzleFeeder extends EngineFeeder {
 
     @Override
     public Frontier getFrontier(EvaluationType type) {
-        return null;
+        //对于IDA*，需要StackFrontier
+        if(type == EvaluationType.HEURISTIC) {
+            return new StackFrontier();//深度优先的栈实现
+        }
+
+
     }
 
     @Override

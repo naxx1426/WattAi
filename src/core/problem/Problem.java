@@ -32,6 +32,7 @@ public abstract class Problem {
     public State getInitialState() {
         return initialState;
     }
+    public State getGoal() {return goal;}
 
     /**
      * 当前问题是否有解
