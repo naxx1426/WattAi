@@ -59,7 +59,7 @@ public abstract class EngineFeeder {
      * 可配置使用不同的启发函数
      * @param type 可配置的启发函数类型
      */
-    public final AbstractSearcher getAStar(HeuristicType type) {
+    public AbstractSearcher getAStar(HeuristicType type) {
         Predictor predictor = getPredictor(type);
         // 获取Frontier，其Node以g(n)+h(n)的升序排列，相同时，按照g(n)的升序排列
         Frontier frontier = getFrontier(EvaluationType.FULL);

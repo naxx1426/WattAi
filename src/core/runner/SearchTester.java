@@ -76,8 +76,8 @@ public final class SearchTester {
         else {
             //NPuzzle问题的第一阶段，使用不在位将牌和曼哈顿距离
             if (step == 1) {
-                heuristics.add(MISPLACED);
                 heuristics.add(MANHATTAN);
+                heuristics.add(MISPLACED);
             }
             //NPuzzle问题的第三阶段，使用Disjoint Pattern
             else if (step == 3){
@@ -110,7 +110,7 @@ public final class SearchTester {
             // 解路径的可视化
             problem.showSolution(path);
 
-            System.out.println("启发函数：" + heuristicType + "，解路径长度：" + path.size() + "，执行了" + time1 + "s，" +
+            System.out.println("启发函数：" + heuristicType + "，解路径长度：" + (path.size() - 1) + "，执行了" + time1 + "s，" +
                     "共生成了" + searcher.nodesGenerated() + "个结点，" +
                     "扩展了" + searcher.nodesExpanded() + "个结点");
         }
