@@ -75,9 +75,9 @@ public class NPuzzleProblem extends Problem {
         // 将二维棋盘扁平化为一维数组，以便计算
         int[] flatArray = new int[size * size];
         int k = 0;
-        for (int i = 0; i < size; i++) {
+        for (int[] ints : grid) {
             for (int j = 0; j < size; j++) {
-                flatArray[k++] = grid[i][j];
+                flatArray[k++] = ints[j];
             }
         }
 
@@ -145,15 +145,14 @@ public class NPuzzleProblem extends Problem {
         int size = board.getSize();
 
         // 根据移动方向判断是否会越界
-        switch (direction) {
-            case N: return blankRow > 0;
-            case S: return blankRow < size - 1;
-            case W: return blankCol > 0;
-            case E: return blankCol < size - 1;
+        return switch (direction) {
+            case N -> blankRow > 0;
+            case S -> blankRow < size - 1;
+            case W -> blankCol > 0;
+            case E -> blankCol < size - 1;
             // N-Puzzle 不支持对角线等其他移动方向
-            default:
-                return false;
-        }
+            default -> false;
+        };
     }
 
 
@@ -184,7 +183,7 @@ public class NPuzzleProblem extends Problem {
             // 打印动作指示
             if (action != null) {
                 System.out.println("   ↓");
-                System.out.printf("   ↓-(#, %s)\n", action.toString());
+                System.out.printf("   ↓-(#, %s)\n", action);
                 System.out.println("   ↓");
             }
 

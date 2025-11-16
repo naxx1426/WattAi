@@ -74,16 +74,13 @@ public class PuzzleFeeder extends EngineFeeder {
      */
     @Override
     public Frontier getFrontier(EvaluationType type) {
-        switch (type) {
+        return switch (type) {
             // 用于 A* 算法 (f = g + h)
-            case FULL:
-                return new PqFrontier();
+            case FULL -> new PqFrontier();
             // 用于 IDA* 等其他算法
-            case HEURISTIC:
-                return new StackFrontier();
-            default:
-                throw new IllegalArgumentException("不支持的 EvaluationType: " + type);
-        }
+            case HEURISTIC -> new StackFrontier();
+            default -> throw new IllegalArgumentException("不支持的 EvaluationType: " + type);
+        };
     }
 
     /**
@@ -93,17 +90,16 @@ public class PuzzleFeeder extends EngineFeeder {
      */
     @Override
     public Predictor getPredictor(HeuristicType type) {
-        switch (type) {
+        return switch (type) {
             // 曼哈顿距离
-            case MANHATTAN:
-                return new ManhattanDistancePredictor();
+            case MANHATTAN -> new ManhattanDistancePredictor();
             // 错位棋子距离 (汉明距离)
-            case MISPLACED:
-                return new HammingDistancePredictor();
-            default:
+            case MISPLACED -> new HammingDistancePredictor();
+            default -> {
                 System.out.println("未知的启发函数, 默认使用曼哈顿距离");
-                return new ManhattanDistancePredictor();
-        }
+                yield new ManhattanDistancePredictor();
+            }
+        };
     }
 
     /**
