@@ -29,6 +29,21 @@ public final class SearchTester {
             NoSuchMethodException, IllegalAccessException,
             InvocationTargetException, InstantiationException, FileNotFoundException {
 
+
+        //这个if语句是我新加的，我不确定这样写对不对？？
+        if (args.length >= 2 && "NPUZZLE".equals(args[1]) && "0".equals(args[2])) {
+            //麻烦各位检查一下这个判断语句，
+            try {
+                Puzzle8Generator.generatePuzzles("resources/random_puzzles.txt", 20);
+                // 使用生成的文件作为输入文件
+                args[0] = "resources/random_puzzles.txt";
+                System.out.println("阶段1：已随机生成20个随机8数码问题用于测试");
+            } catch (FileNotFoundException e) {
+                System.err.println("生成8数码问题失败，使用原有测试文件: " + e.getMessage());
+                //继续使用原来的args[0]文件
+            }
+        }
+
         //根据args[3]提供的类名生成学生的EngineFeeder对象
         EngineFeeder feeder = (EngineFeeder)
                 Class.forName(args[3])
@@ -53,8 +68,23 @@ public final class SearchTester {
 
         for (HeuristicType heuristicType : heuristics) { 
             //solveProblems方法根据不同启发函数生成不同的searcher
-            //从Feeder获取所使用的搜索引擎（AStar，IDAStar等），     
-            solveProblems(problems, feeder.getAStar(heuristicType), heuristicType);
+            //从Feeder获取所使用的搜索引擎（AStar，IDAStar等），
+
+
+            //!!!!!!!各位一定要看看有没有逻辑问题！！！！！
+            switch (step) {
+                case 1://一阶段A*算法
+                    solveProblems(problems, feeder.getAStar(heuristicType),  heuristicType );
+                    break;
+                case 2://二阶段IDA*算法
+                    solveProblems(problems, feeder.getIdaStar(heuristicType), heuristicType);
+                    break;
+                case 3://三阶段IDA*算法
+                    solveProblems(problems, feeder.getIdaStar(heuristicType), heuristicType);
+                    break;
+                default:
+                    break;
+            }
             System.out.println();
         }
     }
@@ -74,12 +104,16 @@ public final class SearchTester {
             heuristics.add(PF_EUCLID);
         }
         else {
-            //NPuzzle问题的第一阶段，使用不在位将牌和曼哈顿距离
+            //！！！！！！第一阶段，使用空位距离和曼哈顿距离！！！！！！
             if (step == 1) {
                 heuristics.add(MANHATTAN);
                 heuristics.add(MISPLACED);
             }
-            //NPuzzle问题的第三阶段，使用Disjoint Pattern
+            //！！！！！！第三阶段，使用曼哈顿距离！！！！！！
+            else if (step == 2) {
+                heuristics.add(MANHATTAN);
+            }
+            //！！！！！！第三阶段，使用Disjoint Pattern！！！！！！
             else if (step == 3){
                 heuristics.add(DISJOINT_PATTERN);
             }
