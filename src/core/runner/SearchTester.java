@@ -31,7 +31,7 @@ public final class SearchTester {
 
 
         //这个if语句是我新加的，我不确定这样写对不对？？
-        if (args.length >= 2 && "NPUZZLE".equals(args[1]) && "0".equals(args[2])) {
+        if (args.length >= 3 && "NPUZZLE".equals(args[1]) && "0".equals(args[2])) {
             //麻烦各位检查一下这个判断语句，
             try {
                 Puzzle8Generator.generatePuzzles("resources/random_puzzles.txt", 20);
