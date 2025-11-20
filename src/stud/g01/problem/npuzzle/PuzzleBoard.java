@@ -170,4 +170,20 @@ public class PuzzleBoard extends State {
     public int getSize() {
         return size;
     }
+
+    /**
+     * 快速查找某个数字在当前棋盘中的线性下标（0 ~ size?-1）
+     * @param number 要查找的数字（通常为 1 ~ size?-1）
+     * @return 线性下标；若找不到返回 -1
+     */
+    public int indexOf(int number) {
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                if (grid[r][c] == number)
+                    return r * size + c;   // 行优先
+            }
+        }
+        return -1; // 未找到（不应发生）
+    }
+
 }

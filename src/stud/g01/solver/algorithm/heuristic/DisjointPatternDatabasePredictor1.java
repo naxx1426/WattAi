@@ -9,19 +9,13 @@ import java.nio.file.*;
 import java.util.*;
 
 /**
- ? <h2>Disjoint Pattern Database Predictor for N-Puzzle</h2>
-
- ? 本实现默认使用 BiBFS 建库，仍支持落盘与读盘。
-
- ? 性能对比请在另一个文件删除 `.db` 后切换策略即可。
-
+ * <h2>Disjoint Pattern Database Predictor for N-Puzzle</h2>
+ * 本实现默认使用 **单向 BFS** 建库，仍支持落盘与读盘。
  *
- ? @author WattAi
-
- ? @since 2025-11
-
+ * @author WattAi
+ * @since 2025-11
  */
-public class DisjointPatternDatabasePredictor implements Predictor {
+public class DisjointPatternDatabasePredictor1 implements Predictor {
 
     /* ===================== 静态工厂缓存 ===================== */
     private static final Map<Integer, PDB> STORE = new HashMap<>();
@@ -30,7 +24,7 @@ public class DisjointPatternDatabasePredictor implements Predictor {
     @Override
     public int heuristics(State state, State goal) {
         PuzzleBoard curr = (PuzzleBoard) state;
-        PuzzleBoard g = (PuzzleBoard) goal;
+        PuzzleBoard g    = (PuzzleBoard) goal;
         int size = curr.getSize();
         if (size != 3 && size != 4)
             throw new IllegalArgumentException("Only 8-puzzle/15-puzzle supported");
@@ -38,20 +32,22 @@ public class DisjointPatternDatabasePredictor implements Predictor {
     }
 
     /* =================================================================== */
-    /* ===================== 内部 PDB（BiBFS修复版） ====================== */
+    /* ===================== 内部 PDB（单向 BFS 版） ====================== */
     private static class PDB {
-        private static long totalBuildNs = 0;
         private final int size, len;
         private final int[][] groups;
         private final int[][] tables;
 
+        /* 可选：累计总建库时间 */
+        private static long totalBuildNs = 0;
+
         PDB(int size) {
             this.size = size;
-            this.len = size * size;
+            this.len  = size * size;
             if (size == 3) {                       // 8-puzzle：4-4
-                groups = new int[][]{{1, 2, 3, 4}, {5, 6, 7, 8}};
+                groups = new int[][]{{1,2,3,4}, {5,6,7,8}};
             } else {                               // 15-puzzle：6-6-3
-                groups = new int[][]{{1, 2, 3, 4, 5, 6}, {7, 8, 9, 10, 11, 12}, {13, 14, 15}};
+                groups = new int[][]{{1,2,3,4,5,6}, {7,8,9,10,11,12}, {13,14,15}};
             }
             tables = new int[groups.length][];
             for (int i = 0; i < groups.length; i++)
@@ -68,13 +64,13 @@ public class DisjointPatternDatabasePredictor implements Predictor {
             return h;
         }
 
-        /* ---------------- 读盘 or 建库（BiBFS修复版） ---------------- */
+        /* ---------------- 读盘 or 建库（单向 BFS） ---------------- */
         private int[] loadOrBuild(int gid) {
             String file = fileName(gid);
             try {
-                return readDB(file).table;          // 优先读盘
+                return readDB(file).table;
             } catch (IOException e) {
-                System.out.println("磁盘无库，开始 BiBFS 建库：" + file);
+                System.out.println("磁盘无库，开始 BFS 建库：" + file);
             }
 
             int[] group = groups[gid];
@@ -85,39 +81,25 @@ public class DisjointPatternDatabasePredictor implements Predictor {
             long start = System.nanoTime();
 
             int goalMask = maskGroup(group);
-            int goalIdx = comboIndex(goalMask, k, len);
+            int goalIdx  = comboIndex(goalMask, k, len);
             table[goalIdx] = 0;
 
-            /* 双向队列：只从 goal 出发，交替扩展 */
-            IntQueue fq = new IntQueue(table.length);
-            IntQueue bq = new IntQueue(table.length);
-            fq.add(goalIdx);
+            IntQueue q = new IntQueue(table.length);
+            q.add(goalIdx);
 
             int[] dr = {-1, 1, 0, 0}, dc = {0, 0, -1, 1};
-            boolean forwardTurn = true;
 
-            while (!fq.isEmpty() || !bq.isEmpty()) {
-                IntQueue curQ = forwardTurn ? fq : bq;
-                IntQueue nxtQ = forwardTurn ? bq : fq;
-                if (curQ.isEmpty()) {               // 当前方向没活，换边
-                    forwardTurn = !forwardTurn;
-                    continue;
-                }
-                int sz = curQ.size();
-                while (sz-- > 0) {
-                    int cur = curQ.poll();
-                    int cost = table[cur];
-                    nodes++;
-                    expandLayerBidir(nxtQ, cur, cost + 1, table, k, dr, dc);
-                }
-                forwardTurn = !forwardTurn;         // 换边
+            while (!q.isEmpty()) {
+                int cur = q.poll();
+                int cost = table[cur];
+                nodes++;
+                expandLayer(q, cur, cost + 1, table, k, dr, dc);
             }
 
             long time = System.nanoTime() - start;
+            totalBuildNs += time;                                // 累计
             double kb = table.length * 4.0 / 1024;
-            totalBuildNs += time;
 
-            /* 落盘 */
             try {
                 writeDB(file, table, group);
             } catch (IOException e) {
@@ -126,9 +108,10 @@ public class DisjointPatternDatabasePredictor implements Predictor {
             return table;
         }
 
-        /* ---------------- 一层双向扩展（统一更新） ---------------- */
-        private void expandLayerBidir(IntQueue oppositeQ, int curIdx, int newCost, int[] table,
-                                      int k, int[] dr, int[] dc) {
+        /* ---------------- 一层扩展（去掉了 Bidir 字样） ---------------- */
+        private void expandLayer(IntQueue queue,
+                                 int curIdx, int newCost, int[] table,
+                                 int k, int[] dr, int[] dc) {
             int pos = unrank(curIdx, k, len);
             boolean[] occ = new boolean[len];
             for (int i = 0; i < len; i++) occ[i] = ((pos >> i) & 1) == 1;
@@ -145,10 +128,9 @@ public class DisjointPatternDatabasePredictor implements Predictor {
                     newPos |= (1 << blank);
                     int newIdx = comboIndex(newPos, k, len);
 
-                    /* 统一更新：更短或首次 */
                     if (table[newIdx] == -1 || table[newIdx] > newCost) {
                         table[newIdx] = newCost;
-                        oppositeQ.add(newIdx);
+                        queue.add(newIdx);
                     }
                 }
             }
@@ -156,10 +138,9 @@ public class DisjointPatternDatabasePredictor implements Predictor {
 
         /* ---------------- 工具 ---------------- */
         private String fileName(int gid) {
-            return size + "puzzle-BiBFS-db-" +
+            return size + "puzzle-BFS-db-" +
                     Arrays.toString(groups[gid]).replace(" ", "") + ".db";
         }
-
         private void writeDB(String file, int[] table, int[] group) throws IOException {
             Path path = Paths.get(file);
             try (DataOutputStream dos = new DataOutputStream(Files.newOutputStream(path))) {
@@ -171,8 +152,7 @@ public class DisjointPatternDatabasePredictor implements Predictor {
             }
         }
 
-        private record DB(int[] table, int size, int[] group) {
-        }
+        private record DB(int[] table, int size, int[] group) {}
 
         private DB readDB(String file) throws IOException {
             Path path = Paths.get(file);
@@ -193,7 +173,6 @@ public class DisjointPatternDatabasePredictor implements Predictor {
             for (int tile : group) m |= 1 << board.indexOf(tile);
             return m;
         }
-
         private int maskGroup(int[] group) {
             int[][] grid = new int[size][size];
             for (int i = 0, v = 1; i < size; i++)
@@ -204,16 +183,12 @@ public class DisjointPatternDatabasePredictor implements Predictor {
             for (int tile : group) mask |= 1 << b.indexOf(tile);
             return mask;
         }
-
         private static int unrank(int idx, int k, int n) {
             int res = 0, cnt = 0;
             for (int i = 0; i < n && cnt < k; i++) {
                 int c = C(n - 1 - i, k - 1 - cnt);
                 if (idx >= c) idx -= c;
-                else {
-                    res |= (1 << i);
-                    cnt++;
-                }
+                else { res |= (1 << i); cnt++; }
             }
             return res;
         }
@@ -230,7 +205,6 @@ public class DisjointPatternDatabasePredictor implements Predictor {
         }
         return idx;
     }
-
     private static int C(int n, int k) {
         if (k < 0 || k > n) return 0;
         if (k > n - k) k = n - k;
@@ -238,31 +212,15 @@ public class DisjointPatternDatabasePredictor implements Predictor {
         for (int i = 1; i <= k; i++) res = res * (n - k + i) / i;
         return res;
     }
-
     private static class IntQueue {
-        private final int[] a;
-        private int h = 0, t = 0;
-
-        IntQueue(int c) {
-            a = new int[c];
-        }
-
-        void add(int v) {
-            a[t++] = v;
-        }
-
-        int poll() {
-            return a[h++];
-        }
-
-        boolean isEmpty() {
-            return h == t;
-        }
-
-        int size() {
-            return t - h;
-        }
+        private final int[] a; private int h = 0, t = 0;
+        IntQueue(int c) { a = new int[c]; }
+        void add(int v) { a[t++] = v; }
+        int poll() { return a[h++]; }
+        boolean isEmpty() { return h == t; }
+        int size() { return t - h; }
     }
+
     /* ===================== 测试 ======================================== */
     public static void main(String[] args) throws IOException {
 
@@ -278,7 +236,7 @@ public class DisjointPatternDatabasePredictor implements Predictor {
         System.out.println("15-puzzle (6-6-3) BFS h = " + h.heuristics(s4, g4));
 
         /* 输出总建库耗时 */
-        System.out.printf("=== 总建库耗时 %.3f s ===%n", DisjointPatternDatabasePredictor.PDB.totalBuildNs / 1_000_000_000.0);
+        System.out.printf("=== 总建库耗时 %.3f s ===%n", DisjointPatternDatabasePredictor1.PDB.totalBuildNs / 1_000_000_000.0);
     }
 
     private static PuzzleBoard std8() {
