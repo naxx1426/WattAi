@@ -170,4 +170,15 @@ public class PuzzleBoard extends State {
     public int getSize() {
         return size;
     }
+
+    public int indexOf(int tile) {
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                if (grid[i][j] == tile) {
+                    return i * size + j;
+                }
+            }
+        }
+        return -1; // 如果没找到（比如空白格）
+    }
 }
