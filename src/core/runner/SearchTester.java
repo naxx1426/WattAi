@@ -128,6 +128,11 @@ public final class SearchTester {
      * @param heuristicType 使用哪种启发函数？
      */
     private static void solveProblems(ArrayList<Problem> problems, AbstractSearcher searcher, HeuristicType heuristicType) {
+        // 定义输出文件的名字
+        String outputFileName = "resources/output.txt";
+        // 在开始新的一轮测试前清空文件
+        new File(outputFileName).delete();
+
         for (Problem problem : problems) {
             // 使用AStar引擎求解问题
             StopwatchCPU timer1 = new StopwatchCPU();
@@ -139,6 +144,20 @@ public final class SearchTester {
                         "共生成了" + searcher.nodesGenerated() + "个结点，" +
                         "扩展了" + searcher.nodesExpanded() + "个结点");
                 continue;
+            }
+
+            try {
+                // 1. 因为 path 是 Deque<Node>，我们需要提取出里面的 State
+                ArrayList<core.problem.State> stateList = new ArrayList<>();
+                for (Node node : path) {
+                    stateList.add(node.getState());
+                }
+                // 2. 调用 PuzzleBoard 里的静态方法写入文件
+                // 注意：需要引入 stud.g01.problem.npuzzle.PuzzleBoard 包
+                stud.g01.problem.npuzzle.PuzzleBoard.saveSolutionToFile(stateList, outputFileName);
+                System.out.println(">> 当前解已追加写入到 " + outputFileName);
+            } catch (Exception e) {
+                System.err.println("文件写入出错: " + e.getMessage());
             }
 
             // 解路径的可视化

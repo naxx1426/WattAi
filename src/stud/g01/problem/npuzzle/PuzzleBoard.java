@@ -5,8 +5,12 @@ import core.problem.State;
 import stud.problem.pathfinding.Direction;
 import stud.problem.pathfinding.Move;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class PuzzleBoard extends State {
 
@@ -180,5 +184,72 @@ public class PuzzleBoard extends State {
             }
         }
         return -1; // 如果没找到（比如空白格）
+    }
+
+    // ==========================================
+    // 新增功能区：文件输出支持
+    // ==========================================
+
+    /**
+     * 将当前棋盘转换为单行空格分隔的字符串
+     * 例如: "5 0 8 4 2 1 7 3 6"
+     */
+    public String toLinearString() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                sb.append(grid[i][j]);
+                if (i < size - 1 || j < size - 1) {
+                    sb.append(" ");
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 将解题路径写入指定文件
+     * 使用追加模式（Append Mode），所以可以连续写入多个Puzzle的解。
+     * * 格式：
+     * N
+     * grid_state_line
+     * ...
+     * finish
+     *
+     * @param path 搜索算法返回的路径列表
+     * @param filename 输出文件的路径（例如 "visualization_data.txt"）
+     */
+    public static void saveSolutionToFile(List<State> path, String filename) {
+        if (path == null || path.isEmpty()) {
+            return;
+        }
+
+        // 使用 try-with-resources 自动关闭文件流
+        // FileWriter(filename, true) 中的 true 表示追加写入
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename, true))) {
+
+            // 1. 写入阶数 (Size)
+            if (path.get(0) instanceof PuzzleBoard) {
+                int size = ((PuzzleBoard) path.get(0)).getSize();
+                writer.write(String.valueOf(size));
+                writer.newLine(); // 换行
+            }
+
+            // 2. 写入每一步的状态
+            for (State state : path) {
+                if (state instanceof PuzzleBoard) {
+                    writer.write(((PuzzleBoard) state).toLinearString());
+                    writer.newLine(); // 换行
+                }
+            }
+
+            // 3. 写入完成标记
+            writer.write("finish");
+            writer.newLine(); // 换行
+
+        } catch (IOException e) {
+            System.err.println("写入文件失败: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
