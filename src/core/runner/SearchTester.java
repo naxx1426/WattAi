@@ -68,11 +68,10 @@ public final class SearchTester {
             //solveProblems方法根据不同启发函数生成不同的searcher
             //从Feeder获取所使用的搜索引擎（AStar，IDAStar等），
 
-
             //!!!!!!!各位一定要看看有没有逻辑问题！！！！！
             switch (step) {
                 case 1://一阶段A*算法
-                    solveProblems(problems, feeder.getAStar(heuristicType),  heuristicType );
+                    solveProblems(problems, feeder.getAStar(heuristicType),  heuristicType);
                     break;
                 case 2://二阶段IDA*算法
                     solveProblems(problems, feeder.getIdaStar(heuristicType), heuristicType);
@@ -127,6 +126,11 @@ public final class SearchTester {
      * @param heuristicType 使用哪种启发函数？
      */
     private static void solveProblems(ArrayList<Problem> problems, AbstractSearcher searcher, HeuristicType heuristicType) {
+        // 定义输出文件的名字
+        String outputFileName = "resources/output.txt";
+        // 在开始新的一轮测试前清空文件
+        new File(outputFileName).delete();
+
         for (Problem problem : problems) {
             // 使用AStar引擎求解问题
             StopwatchCPU timer1 = new StopwatchCPU();
@@ -138,6 +142,17 @@ public final class SearchTester {
                         "共生成了" + searcher.nodesGenerated() + "个结点，" +
                         "扩展了" + searcher.nodesExpanded() + "个结点");
                 continue;
+            }
+
+            try {
+                ArrayList<core.problem.State> stateList = new ArrayList<>();
+                for (Node node : path) {
+                    stateList.add(node.getState());
+                }
+                stud.g01.problem.npuzzle.PuzzleBoard.saveSolutionToFile(stateList, outputFileName);
+                System.out.println(">> 当前解已追加写入到 " + outputFileName);
+            } catch (Exception e) {
+                System.err.println("文件写入出错: " + e.getMessage());
             }
 
             // 解路径的可视化
