@@ -30,19 +30,17 @@ public final class SearchTester {
             InvocationTargetException, InstantiationException, FileNotFoundException {
 
 
-        //这个if语句是我新加的，我不确定这样写对不对？？
-        if (args.length >= 2 && "NPUZZLE".equals(args[1]) && "0".equals(args[2])) {
-            //麻烦各位检查一下这个判断语句，
-            try {
-                Puzzle8Generator.generatePuzzles("resources/random_puzzles.txt", 20);
-                // 使用生成的文件作为输入文件
-                args[0] = "resources/random_puzzles.txt";
-                System.out.println("阶段1：已随机生成20个随机8数码问题用于测试");
-            } catch (FileNotFoundException e) {
-                System.err.println("生成8数码问题失败，使用原有测试文件: " + e.getMessage());
-                //继续使用原来的args[0]文件
-            }
-        }
+
+        Puzzle8Generator.generatePuzzles("resources/8.txt", 10);
+//        // 使用生成的文件作为输入文件
+        args[0] = "resources/8.txt";
+        System.out.println("已随机生成10个随机8数码问题用于测试");
+//
+//        Puzzle15Generator.generatePuzzles("resources/15.txt", 3);
+//        // 使用生成的文件作为输入文件
+//        args[0] = "resources/15.txt";
+//        System.out.println("已随机生成3个随机15数码问题用于测试");
+
 
         //根据args[3]提供的类名生成学生的EngineFeeder对象
         EngineFeeder feeder = (EngineFeeder)
@@ -112,6 +110,7 @@ public final class SearchTester {
             //！！！！！！第三阶段，使用曼哈顿距离！！！！！！
             else if (step == 2) {
                 heuristics.add(MANHATTAN);
+                heuristics.add(MISPLACED);
             }
             //！！！！！！第三阶段，使用Disjoint Pattern！！！！！！
             else if (step == 3){
@@ -147,6 +146,16 @@ public final class SearchTester {
             System.out.println("启发函数：" + heuristicType + "，解路径长度：" + (path.size() - 1) + "，执行了" + time1 + "s，" +
                     "共生成了" + searcher.nodesGenerated() + "个结点，" +
                     "扩展了" + searcher.nodesExpanded() + "个结点");
+
+
+            //运行时间分析
+//            System.out.println("启发函数：" + heuristicType + "，解路径长度：" + (path.size() - 1) + "，执行了" + time1 + "s" );
+
+
+            //扩展结点分析
+//            System.out.println("启发函数：" + heuristicType + "，解路径长度：" + (path.size() - 1)  +
+//                    " 共生成了" + searcher.nodesGenerated() + "个结点，" +
+//                    "扩展了" + searcher.nodesExpanded() + "个结点");
         }
     }
 

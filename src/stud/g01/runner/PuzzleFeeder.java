@@ -8,11 +8,11 @@ import core.solver.algorithm.heuristic.Predictor;
 import core.solver.algorithm.searcher.AbstractSearcher;
 import core.solver.queue.EvaluationType;
 import core.solver.queue.Frontier;
-import stud.g01.solver.algorithm.heuristic.DisjointPatternDatabasePredictor;
+import core.solver.queue.Node;
 import stud.g01.solver.algorithm.heuristic.HammingDistancePredictor;
 import stud.g01.solver.algorithm.heuristic.ManhattanDistancePredictor;
 import stud.g01.queue.PqFrontier;
-import stud.g01.queue.StackFrontier;
+import stud.g01.queue.ListFrontier;
 import stud.g01.problem.npuzzle.NPuzzleProblem;
 import stud.g01.problem.npuzzle.PuzzleBoard;
 import stud.g01.solver.algorithm.searcher.aStar;
@@ -78,8 +78,10 @@ public class PuzzleFeeder extends EngineFeeder {
         return switch (type) {
             // 用于 A* 算法 (f = g + h)
             case FULL -> new PqFrontier();
+            //用于性能测试，使用ListFrontier
+//            case FULL -> new ListFrontier(Node.evaluator(EvaluationType.FULL));
             // 用于 IDA* 等其他算法
-            case HEURISTIC -> new StackFrontier();
+            case HEURISTIC -> new PqFrontier();
             default -> throw new IllegalArgumentException("不支持的 EvaluationType: " + type);
         };
     }
@@ -96,8 +98,6 @@ public class PuzzleFeeder extends EngineFeeder {
             case MANHATTAN -> new ManhattanDistancePredictor();
             // 错位棋子距离 (汉明距离)
             case MISPLACED -> new HammingDistancePredictor();
-            //
-            case DISJOINT_PATTERN -> new DisjointPatternDatabasePredictor();
             default -> {
                 System.out.println("未知的启发函数, 默认使用曼哈顿距离");
                 yield new ManhattanDistancePredictor();
