@@ -50,9 +50,10 @@ public class DisjointPatternDatabasePredictor implements Predictor {
             groups.add(Arrays.asList(5, 6, 7, 8));  // 下半部分
         } else {
             // 15-puzzle: 6-6-3分组（文献最优分组）
-            groups.add(Arrays.asList(1, 2, 3, 4, 5, 6));    // 左上区域
-            groups.add(Arrays.asList(7, 8, 9, 10, 11, 12)); // 右上区域
-            groups.add(Arrays.asList(13, 14, 15));          // 底部区域
+            groups.add(Arrays.asList(1, 2, 3, 4));    // 左上区域
+            groups.add(Arrays.asList(5, 6, 7, 8)); // 右上区域
+            groups.add(Arrays.asList(9, 10, 11, 12));
+            groups.add(Arrays.asList(13, 14, 15)); // 底部区域
         }
 
         return groups;
@@ -205,21 +206,18 @@ public class DisjointPatternDatabasePredictor implements Predictor {
             int[][] grid = board.getGrid();
             StringBuilder sb = new StringBuilder();
 
+            // 编码整个棋盘：模式内瓷砖显示数字，其他显示'*'
             for (int i = 0; i < size; i++) {
                 for (int j = 0; j < size; j++) {
                     int value = grid[i][j];
                     if (value == 0) {
-                        sb.append("0,");
+                        sb.append('0'); // 空格特殊处理
                     } else if (group.contains(value)) {
-                        sb.append(value).append(',');
+                        sb.append(value).append(','); // 模式内瓷砖
                     } else {
-                        sb.append("*,");
+                        sb.append('*').append(',');   // 不关心的瓷砖
                     }
                 }
-            }
-            // 移除末尾多余逗号
-            if (sb.length() > 0 && sb.charAt(sb.length() - 1) == ',') {
-                sb.setLength(sb.length() - 1);
             }
 
             return sb.toString();
@@ -337,60 +335,4 @@ public class DisjointPatternDatabasePredictor implements Predictor {
         }
     }
 
-    /* ===================== 测试方法 ===================== */
-
-    public static void main(String[] args) {
-        test8Puzzle();
-        test15Puzzle();
-    }
-
-    private static void test8Puzzle() {
-        System.out.println("=== 测试8-puzzle分离模式数据库 ===");
-
-        int[][] goalBoard3x3 = {
-                {1, 2, 3},
-                {4, 5, 6},
-                {7, 8, 0}
-        };
-
-        int[][] testBoard3x3 = {
-                {0, 1, 3},
-                {4, 2, 6},
-                {7, 5, 8}
-        };
-
-        PuzzleBoard goal3x3 = new PuzzleBoard(goalBoard3x3);
-        PuzzleBoard test3x3 = new PuzzleBoard(testBoard3x3);
-
-        DisjointPatternDatabasePredictor predictor = new DisjointPatternDatabasePredictor();
-        int heuristic = predictor.heuristics(test3x3, goal3x3);
-
-        System.out.println("8-puzzle分离模式数据库启发式值: " + heuristic);
-    }
-
-    private static void test15Puzzle() {
-        System.out.println("=== 测试15-puzzle分离模式数据库 ===");
-
-        int[][] goalBoard4x4 = {
-                {1, 2, 3, 4},
-                {5, 6, 7, 8},
-                {9, 10, 11, 12},
-                {13, 14, 15, 0}
-        };
-
-        int[][] testBoard4x4 = {
-                {1, 2, 3, 4},
-                {5, 6, 7, 8},
-                {9, 10, 11, 0},
-                {12, 13, 14, 15}
-        };
-
-        PuzzleBoard goal4x4 = new PuzzleBoard(goalBoard4x4);
-        PuzzleBoard test4x4 = new PuzzleBoard(testBoard4x4);
-
-        DisjointPatternDatabasePredictor predictor = new DisjointPatternDatabasePredictor();
-        int heuristic = predictor.heuristics(test4x4, goal4x4);
-
-        System.out.println("15-puzzle分离模式数据库启发式值: " + heuristic);
-    }
 }

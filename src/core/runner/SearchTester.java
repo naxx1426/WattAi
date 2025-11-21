@@ -31,11 +31,11 @@ public final class SearchTester {
 
 
 
-        Puzzle8Generator.generatePuzzles("resources/8.txt", 10);
-//        // 使用生成的文件作为输入文件
-        args[0] = "resources/8.txt";
-        System.out.println("已随机生成10个随机8数码问题用于测试");
-//
+//        Puzzle8Generator.generatePuzzles("resources/8.txt", 10);
+////        // 使用生成的文件作为输入文件
+//        args[0] = "resources/8.txt";
+//        System.out.println("已随机生成10个随机8数码问题用于测试");
+////
 //        Puzzle15Generator.generatePuzzles("resources/15.txt", 3);
 //        // 使用生成的文件作为输入文件
 //        args[0] = "resources/15.txt";
@@ -141,7 +141,7 @@ public final class SearchTester {
             }
 
             // 解路径的可视化
-            //problem.showSolution(path);
+            problem.showSolution(path);
 
             System.out.println("启发函数：" + heuristicType + "，解路径长度：" + (path.size() - 1) + "，执行了" + time1 + "s，" +
                     "共生成了" + searcher.nodesGenerated() + "个结点，" +
