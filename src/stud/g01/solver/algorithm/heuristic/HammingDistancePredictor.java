@@ -25,35 +25,12 @@ public class HammingDistancePredictor implements Predictor {
         int misplaced = 0;
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
-                // 空位和相邻位置都不考虑，仅统计“值不同”
-                if (sg[i][j] != 0 && sg[i][j] != gg[i][j]) {
+                // 标准汉明距离：比较所有位置，包括空位
+                if (sg[i][j] != gg[i][j]) {
                     misplaced++;
                 }
             }
         }
         return misplaced;
-    }
-
-    public static void main(String[] args) {
-        int[][] start = {
-                {0, 1, 2},
-                {3, 4, 5},
-                {6, 7, 8}
-        };
-        int[][] goal = {
-                {1, 2, 3},
-                {4, 5, 6},
-                {7, 8, 0}
-        };
-
-        PuzzleBoard startBoard = new PuzzleBoard(start);
-        PuzzleBoard goalBoard = new PuzzleBoard(goal);
-
-        HammingDistancePredictor predictor = new HammingDistancePredictor();
-        int dist = predictor.heuristics(startBoard, goalBoard);
-
-        System.out.println("汉明距离 = " + dist);
-        System.out.println("预期结果 = 8");
-        System.out.println(dist == 8 ? "? 逻辑正确" : "? 逻辑错误");
     }
 }

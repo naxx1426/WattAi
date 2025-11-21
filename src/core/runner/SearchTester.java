@@ -142,7 +142,7 @@ public final class SearchTester {
             }
 
             // 解路径的可视化
-            problem.showSolution(path);
+            //problem.showSolution(path);
 
             System.out.println("启发函数：" + heuristicType + "，解路径长度：" + (path.size() - 1) + "，执行了" + time1 + "s，" +
                     "共生成了" + searcher.nodesGenerated() + "个结点，" +

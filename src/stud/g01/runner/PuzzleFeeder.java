@@ -8,6 +8,7 @@ import core.solver.algorithm.heuristic.Predictor;
 import core.solver.algorithm.searcher.AbstractSearcher;
 import core.solver.queue.EvaluationType;
 import core.solver.queue.Frontier;
+import stud.g01.solver.algorithm.heuristic.DisjointPatternDatabasePredictor;
 import stud.g01.solver.algorithm.heuristic.HammingDistancePredictor;
 import stud.g01.solver.algorithm.heuristic.ManhattanDistancePredictor;
 import stud.g01.queue.PqFrontier;
@@ -95,6 +96,8 @@ public class PuzzleFeeder extends EngineFeeder {
             case MANHATTAN -> new ManhattanDistancePredictor();
             // 错位棋子距离 (汉明距离)
             case MISPLACED -> new HammingDistancePredictor();
+            //
+            case DISJOINT_PATTERN -> new DisjointPatternDatabasePredictor();
             default -> {
                 System.out.println("未知的启发函数, 默认使用曼哈顿距离");
                 yield new ManhattanDistancePredictor();

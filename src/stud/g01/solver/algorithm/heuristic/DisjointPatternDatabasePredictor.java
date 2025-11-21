@@ -3,298 +3,394 @@ package stud.g01.solver.algorithm.heuristic;
 import core.problem.State;
 import core.solver.algorithm.heuristic.Predictor;
 import stud.g01.problem.npuzzle.PuzzleBoard;
+import core.problem.Action;
 
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-/**
- ? <h2>Disjoint Pattern Database Predictor for N-Puzzle</h2>
-
- ? 本实现默认使用 BiBFS 建库，仍支持落盘与读盘。
-
- ? 性能对比请在另一个文件删除 `.db` 后切换策略即可。
-
- *
- ? @author WattAi
-
- ? @since 2025-11
-
- */
 public class DisjointPatternDatabasePredictor implements Predictor {
 
-    /* ===================== 静态工厂缓存 ===================== */
-    private static final Map<Integer, PDB> STORE = new HashMap<>();
+    // 静态数据库缓存，避免重复构建
+    private static final Map<Integer, DisjointPatternDatabase> DATABASE_CACHE = new HashMap<>();
 
-    /* ===================== 对外接口 ======================== */
     @Override
     public int heuristics(State state, State goal) {
-        PuzzleBoard curr = (PuzzleBoard) state;
-        PuzzleBoard g = (PuzzleBoard) goal;
-        int size = curr.getSize();
-        if (size != 3 && size != 4)
-            throw new IllegalArgumentException("Only 8-puzzle/15-puzzle supported");
-        return STORE.computeIfAbsent(size, PDB::new).lookup(curr, g);
+        PuzzleBoard current = (PuzzleBoard) state;
+        PuzzleBoard goalBoard = (PuzzleBoard) goal;
+        int size = current.getSize();
+
+        validatePuzzleSize(size);
+
+        // 延迟加载数据库
+        DisjointPatternDatabase database = DATABASE_CACHE.computeIfAbsent(size,
+                s -> new DisjointPatternDatabase(s, createOptimalGrouping(s)));
+
+        return database.calculateHeuristic(current, goalBoard);
     }
 
-    /* =================================================================== */
-    /* ===================== 内部 PDB（BiBFS修复版） ====================== */
-    private static class PDB {
-        private static long totalBuildNs = 0;
-        private final int size, len;
-        private final int[][] groups;
-        private final int[][] tables;
+    /**
+     * 验证拼图规模支持
+     */
+    private void validatePuzzleSize(int size) {
+        if (size != 3 && size != 4) {
+            throw new IllegalArgumentException("仅支持3x3(8-puzzle)和4x4(15-puzzle)规模的拼图");
+        }
+    }
 
-        PDB(int size) {
+    /**
+     * 创建最优分组方案（基于文献推荐的分组策略）
+     */
+    private List<List<Integer>> createOptimalGrouping(int size) {
+        List<List<Integer>> groups = new ArrayList<>();
+
+        if (size == 3) {
+            // 8-puzzle: 4-4分组（上半部分和下半部分）
+            groups.add(Arrays.asList(1, 2, 3, 4));  // 上半部分
+            groups.add(Arrays.asList(5, 6, 7, 8));  // 下半部分
+        } else {
+            // 15-puzzle: 6-6-3分组（文献最优分组）
+            groups.add(Arrays.asList(1, 2, 3, 4, 5, 6));    // 左上区域
+            groups.add(Arrays.asList(7, 8, 9, 10, 11, 12)); // 右上区域
+            groups.add(Arrays.asList(13, 14, 15));          // 底部区域
+        }
+
+        return groups;
+    }
+
+    /* ===================== 分离模式数据库内部类 ====================== */
+    private static class DisjointPatternDatabase {
+        private final int size;
+        private final List<List<Integer>> disjointGroups;
+        private final List<Map<String, Integer>> patternDatabases;
+        private final String cachePrefix;
+
+        DisjointPatternDatabase(int size, List<List<Integer>> groups) {
             this.size = size;
-            this.len = size * size;
-            if (size == 3) {                       // 8-puzzle：4-4
-                groups = new int[][]{{1, 2, 3, 4}, {5, 6, 7, 8}};
-            } else {                               // 15-puzzle：6-6-3
-                groups = new int[][]{{1, 2, 3, 4, 5, 6}, {7, 8, 9, 10, 11, 12}, {13, 14, 15}};
-            }
-            tables = new int[groups.length][];
-            for (int i = 0; i < groups.length; i++)
-                tables[i] = loadOrBuild(i);
+            this.disjointGroups = groups;
+            this.patternDatabases = new ArrayList<>();
+            this.cachePrefix = "disjoint-pdb-" + size + "x" + size + "-";
+
+            initializeDatabases();
         }
 
-        int lookup(PuzzleBoard curr, PuzzleBoard goal) {
-            int h = 0;
-            for (int i = 0; i < groups.length; i++) {
-                int idx = comboIndex(mask(curr, groups[i]), groups[i].length, len);
-                int gIdx = comboIndex(mask(goal, groups[i]), groups[i].length, len);
-                h += Math.abs(tables[i][idx] - tables[i][gIdx]);
+        /**
+         * 初始化所有模式数据库
+         */
+        private void initializeDatabases() {
+            PuzzleBoard goal = createGoalBoard(size);
+
+            for (int i = 0; i < disjointGroups.size(); i++) {
+                List<Integer> group = disjointGroups.get(i);
+                Map<String, Integer> db = loadOrBuildDatabase(goal, group, i);
+                patternDatabases.add(db);
+
+                System.out.printf("模式数据库 %d: 分组 %s, 状态数 %d%n",
+                        i + 1, group, db.size());
             }
-            return h;
         }
 
-        /* ---------------- 读盘 or 建库（BiBFS修复版） ---------------- */
-        private int[] loadOrBuild(int gid) {
-            String file = fileName(gid);
-            try {
-                return readDB(file).table;          // 优先读盘
-            } catch (IOException e) {
-                System.out.println("磁盘无库，开始 BiBFS 建库：" + file);
+        /**
+         * 计算启发式值（核心算法）- 可加性原理
+         */
+        int calculateHeuristic(PuzzleBoard current, PuzzleBoard goal) {
+            int totalHeuristic = 0;
+
+            // 对每个不相交模式分别计算并累加（可加性定理）
+            for (int i = 0; i < disjointGroups.size(); i++) {
+                List<Integer> group = disjointGroups.get(i);
+                Map<String, Integer> db = patternDatabases.get(i);
+
+                int patternCost = getPatternCost(current, group, db);
+                totalHeuristic += patternCost;
             }
 
-            int[] group = groups[gid];
-            int k = group.length;
-            int[] table = new int[C(len, k)];
-            Arrays.fill(table, -1);
-            long nodes = 0;
-            long start = System.nanoTime();
-
-            int goalMask = maskGroup(group);
-            int goalIdx = comboIndex(goalMask, k, len);
-            table[goalIdx] = 0;
-
-            /* 双向队列：只从 goal 出发，交替扩展 */
-            IntQueue fq = new IntQueue(table.length);
-            IntQueue bq = new IntQueue(table.length);
-            fq.add(goalIdx);
-
-            int[] dr = {-1, 1, 0, 0}, dc = {0, 0, -1, 1};
-            boolean forwardTurn = true;
-
-            while (!fq.isEmpty() || !bq.isEmpty()) {
-                IntQueue curQ = forwardTurn ? fq : bq;
-                IntQueue nxtQ = forwardTurn ? bq : fq;
-                if (curQ.isEmpty()) {               // 当前方向没活，换边
-                    forwardTurn = !forwardTurn;
-                    continue;
-                }
-                int sz = curQ.size();
-                while (sz-- > 0) {
-                    int cur = curQ.poll();
-                    int cost = table[cur];
-                    nodes++;
-                    expandLayerBidir(nxtQ, cur, cost + 1, table, k, dr, dc);
-                }
-                forwardTurn = !forwardTurn;         // 换边
-            }
-
-            long time = System.nanoTime() - start;
-            double kb = table.length * 4.0 / 1024;
-            totalBuildNs += time;
-
-            /* 落盘 */
-            try {
-                writeDB(file, table, group);
-            } catch (IOException e) {
-                System.out.println("写盘失败：" + e.getMessage());
-            }
-            return table;
+            return totalHeuristic;
         }
 
-        /* ---------------- 一层双向扩展（统一更新） ---------------- */
-        private void expandLayerBidir(IntQueue oppositeQ, int curIdx, int newCost, int[] table,
-                                      int k, int[] dr, int[] dc) {
-            int pos = unrank(curIdx, k, len);
-            boolean[] occ = new boolean[len];
-            for (int i = 0; i < len; i++) occ[i] = ((pos >> i) & 1) == 1;
+        /**
+         * 获取单个模式的代价
+         */
+        private int getPatternCost(PuzzleBoard board, List<Integer> group,
+                                   Map<String, Integer> database) {
+            String stateCode = encodePatternState(board, group);
+            Integer cost = database.get(stateCode);
 
-            for (int blank = 0; blank < len; blank++) {
-                if (occ[blank]) continue;
-                int br = blank / size, bc = blank % size;
-                for (int d = 0; d < 4; d++) {
-                    int nr = br + dr[d], nc = bc + dc[d];
-                    if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
-                    int nxt = nr * size + nc;
-                    if (!occ[nxt]) continue;
-                    int newPos = pos & ~(1 << nxt);
-                    newPos |= (1 << blank);
-                    int newIdx = comboIndex(newPos, k, len);
+            // 如果数据库中不存在，使用分组曼哈顿距离作为回退
+            return cost != null ? cost : calculateGroupManhattan(board, group);
+        }
 
-                    /* 统一更新：更短或首次 */
-                    if (table[newIdx] == -1 || table[newIdx] > newCost) {
-                        table[newIdx] = newCost;
-                        oppositeQ.add(newIdx);
+        /* ===================== 数据库构建算法 ===================== */
+
+        /**
+         * 加载或构建数据库
+         */
+        private Map<String, Integer> loadOrBuildDatabase(PuzzleBoard goal,
+                                                         List<Integer> group, int groupIndex) {
+            String cacheFile = cachePrefix + "group" + groupIndex + ".cache";
+
+            // 尝试从缓存加载
+            Map<String, Integer> cachedDb = loadDatabaseFromCache(cacheFile);
+            if (cachedDb != null) {
+                System.out.println("加载缓存数据库: " + cacheFile);
+                return cachedDb;
+            }
+
+            // 重新构建数据库（BFS算法）
+            System.out.println("构建分离模式数据库: " + group);
+            long startTime = System.nanoTime();
+
+            Map<String, Integer> db = buildPatternDatabase(goal, group);
+            saveDatabaseToCache(db, cacheFile);
+
+            long endTime = System.nanoTime();
+            System.out.printf("数据库构建完成: %d states, 耗时: %.3f秒\n",
+                    db.size(), (endTime - startTime) / 1e9);
+
+            return db;
+        }
+
+        /**
+         * 构建单个模式数据库（BFS算法）
+         * 关键：只关心模式内瓷砖的移动，忽略其他瓷砖
+         */
+        private Map<String, Integer> buildPatternDatabase(PuzzleBoard goal, List<Integer> group) {
+            Map<String, Integer> database = new HashMap<>();
+            Queue<Node> queue = new ArrayDeque<>();
+            Set<String> visited = new HashSet<>();
+
+            // 从目标状态开始BFS
+            String goalCode = encodePatternState(goal, group);
+            database.put(goalCode, 0);
+            queue.offer(new Node(goal, 0));
+            visited.add(goalCode);
+
+            int statesExplored = 0;
+
+            while (!queue.isEmpty()) {
+                Node currentNode = queue.poll();
+                PuzzleBoard current = currentNode.board;
+                int currentCost = currentNode.cost;
+
+                statesExplored++;
+
+                // 扩展所有可能的移动
+                for (Object actionObj : current.actions()) {
+                    Action action = (Action) actionObj;
+                    PuzzleBoard next = (PuzzleBoard) current.next(action);
+                    if (next == null) continue;
+
+                    String nextCode = encodePatternState(next, group);
+
+                    if (!visited.contains(nextCode)) {
+                        visited.add(nextCode);
+                        int nextCost = currentCost + 1;
+                        database.put(nextCode, nextCost);
+                        queue.offer(new Node(next, nextCost));
                     }
                 }
             }
+
+            System.out.printf("  探索状态: %d, 数据库大小: %d%n", statesExplored, database.size());
+            return database;
         }
 
-        /* ---------------- 工具 ---------------- */
-        private String fileName(int gid) {
-            return size + "puzzle-BiBFS-db-" +
-                    Arrays.toString(groups[gid]).replace(" ", "") + ".db";
-        }
+        /* ===================== 状态编码算法 ===================== */
 
-        private void writeDB(String file, int[] table, int[] group) throws IOException {
-            Path path = Paths.get(file);
-            try (DataOutputStream dos = new DataOutputStream(Files.newOutputStream(path))) {
-                dos.writeInt(size);
-                dos.writeInt(group.length);
-                for (int t : group) dos.writeInt(t);
-                dos.writeInt(table.length);
-                for (int v : table) dos.writeInt(v);
-            }
-        }
+        /**
+         * 编码模式状态（核心编码方法）
+         * 关键：只关心模式内瓷砖的位置，其他位置用'*'表示
+         */
+        private String encodePatternState(PuzzleBoard board, List<Integer> group) {
+            int[][] grid = board.getGrid();
+            StringBuilder sb = new StringBuilder();
 
-        private record DB(int[] table, int size, int[] group) {
-        }
-
-        private DB readDB(String file) throws IOException {
-            Path path = Paths.get(file);
-            try (DataInputStream dis = new DataInputStream(Files.newInputStream(path))) {
-                int s = dis.readInt();
-                int k = dis.readInt();
-                int[] g = new int[k];
-                for (int i = 0; i < k; i++) g[i] = dis.readInt();
-                int len = dis.readInt();
-                int[] t = new int[len];
-                for (int i = 0; i < len; i++) t[i] = dis.readInt();
-                return new DB(t, s, g);
-            }
-        }
-
-        private int mask(PuzzleBoard board, int[] group) {
-            int m = 0;
-            for (int tile : group) m |= 1 << board.indexOf(tile);
-            return m;
-        }
-
-        private int maskGroup(int[] group) {
-            int[][] grid = new int[size][size];
-            for (int i = 0, v = 1; i < size; i++)
-                for (int j = 0; j < size; j++)
-                    if (v < size * size) grid[i][j] = v++;
-            PuzzleBoard b = new PuzzleBoard(grid);
-            int mask = 0;
-            for (int tile : group) mask |= 1 << b.indexOf(tile);
-            return mask;
-        }
-
-        private static int unrank(int idx, int k, int n) {
-            int res = 0, cnt = 0;
-            for (int i = 0; i < n && cnt < k; i++) {
-                int c = C(n - 1 - i, k - 1 - cnt);
-                if (idx >= c) idx -= c;
-                else {
-                    res |= (1 << i);
-                    cnt++;
+            for (int i = 0; i < size; i++) {
+                for (int j = 0; j < size; j++) {
+                    int value = grid[i][j];
+                    if (value == 0) {
+                        sb.append("0,");
+                    } else if (group.contains(value)) {
+                        sb.append(value).append(',');
+                    } else {
+                        sb.append("*,");
+                    }
                 }
             }
-            return res;
-        }
-    }
+            // 移除末尾多余逗号
+            if (sb.length() > 0 && sb.charAt(sb.length() - 1) == ',') {
+                sb.setLength(sb.length() - 1);
+            }
 
-    /* ===================== 组合工具 ==================================== */
-    private static int comboIndex(int bits, int k, int n) {
-        int idx = 0, cnt = 0;
-        for (int i = 0; i < n && cnt < k; i++) {
-            if (((bits >> i) & 1) == 1) {
-                idx += C(n - 1 - i, k - 1 - cnt);
-                cnt++;
+            return sb.toString();
+        }
+
+        /* ===================== 工具方法 ===================== */
+
+        /**
+         * 创建目标棋盘
+         */
+        private PuzzleBoard createGoalBoard(int size) {
+            int[][] goalGrid = new int[size][size];
+            int value = 1;
+
+            for (int i = 0; i < size; i++) {
+                for (int j = 0; j < size; j++) {
+                    if (i == size - 1 && j == size - 1) {
+                        goalGrid[i][j] = 0; // 空白格
+                    } else {
+                        goalGrid[i][j] = value++;
+                    }
+                }
+            }
+
+            return new PuzzleBoard(goalGrid);
+        }
+
+        /**
+         * 计算分组曼哈顿距离（回退启发式）
+         */
+        private int calculateGroupManhattan(PuzzleBoard board, List<Integer> group) {
+            int[][] grid = board.getGrid();
+            int heuristic = 0;
+
+            // 创建目标位置映射
+            Map<Integer, int[]> targetPositions = createTargetPositions(group);
+
+            // 只计算分组内数字的曼哈顿距离
+            for (int i = 0; i < size; i++) {
+                for (int j = 0; j < size; j++) {
+                    int value = grid[i][j];
+                    if (group.contains(value) && value != 0) {
+                        int[] targetPos = targetPositions.get(value);
+                        if (targetPos != null) {
+                            heuristic += Math.abs(i - targetPos[0]) + Math.abs(j - targetPos[1]);
+                        }
+                    }
+                }
+            }
+
+            return heuristic;
+        }
+
+        /**
+         * 创建分组内瓷砖的目标位置映射
+         */
+        private Map<Integer, int[]> createTargetPositions(List<Integer> group) {
+            Map<Integer, int[]> positions = new HashMap<>();
+            PuzzleBoard goal = createGoalBoard(size);
+            int[][] goalGrid = goal.getGrid();
+
+            for (int i = 0; i < size; i++) {
+                for (int j = 0; j < size; j++) {
+                    int value = goalGrid[i][j];
+                    if (group.contains(value) && value != 0) {
+                        positions.put(value, new int[]{i, j});
+                    }
+                }
+            }
+
+            return positions;
+        }
+
+        /* ===================== 缓存管理 ===================== */
+
+        private Map<String, Integer> loadDatabaseFromCache(String filename) {
+            try {
+                Path path = Paths.get(filename);
+                if (!Files.exists(path)) return null;
+
+                try (ObjectInputStream ois = new ObjectInputStream(
+                        Files.newInputStream(path))) {
+                    return (Map<String, Integer>) ois.readObject();
+                }
+            } catch (Exception e) {
+                System.out.println("缓存加载失败: " + e.getMessage());
+                return null;
             }
         }
-        return idx;
-    }
 
-    private static int C(int n, int k) {
-        if (k < 0 || k > n) return 0;
-        if (k > n - k) k = n - k;
-        int res = 1;
-        for (int i = 1; i <= k; i++) res = res * (n - k + i) / i;
-        return res;
-    }
-
-    private static class IntQueue {
-        private final int[] a;
-        private int h = 0, t = 0;
-
-        IntQueue(int c) {
-            a = new int[c];
-        }
-
-        void add(int v) {
-            a[t++] = v;
-        }
-
-        int poll() {
-            return a[h++];
-        }
-
-        boolean isEmpty() {
-            return h == t;
-        }
-
-        int size() {
-            return t - h;
+        private void saveDatabaseToCache(Map<String, Integer> database, String filename) {
+            try {
+                try (ObjectOutputStream oos = new ObjectOutputStream(
+                        Files.newOutputStream(Paths.get(filename)))) {
+                    oos.writeObject(database);
+                }
+            } catch (Exception e) {
+                System.out.println("缓存保存失败: " + e.getMessage());
+            }
         }
     }
-    /* ===================== 测试 ======================================== */
-    public static void main(String[] args) throws IOException {
 
-        Files.newDirectoryStream(Paths.get(""), "*puzzle-BiBFS-db-*.db")
-                .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignore) {} });
+    /* ===================== 辅助类 ===================== */
 
+    /**
+     * BFS节点类，用于模式数据库构建
+     */
+    private static class Node {
+        final PuzzleBoard board;
+        final int cost;
 
-        PuzzleBoard g3 = std8(), s3 = shuffle8();
-        Predictor h = new DisjointPatternDatabasePredictor();
-        System.out.println("8-puzzle (4-4) BiBFS h = " + h.heuristics(s3, g3));
-
-        PuzzleBoard g4 = std15(), s4 = shuffle15();
-        System.out.println("15-puzzle (6-6-3) BiBFS h = " + h.heuristics(s4, g4));
-
-        /* 输出总建库耗时 */
-        System.out.printf("=== 总建库耗时 %.3f s ===%n", DisjointPatternDatabasePredictor.PDB.totalBuildNs / 1_000_000_000.0);
+        Node(PuzzleBoard board, int cost) {
+            this.board = board;
+            this.cost = cost;
+        }
     }
 
-    private static PuzzleBoard std8() {
-        int[][] g = {{1,2,3},{4,5,6},{7,8,0}};
-        return new PuzzleBoard(g);
+    /* ===================== 测试方法 ===================== */
+
+    public static void main(String[] args) {
+        test8Puzzle();
+        test15Puzzle();
     }
-    private static PuzzleBoard shuffle8() {
-        int[][] s = {{1,4,3},{7,2,6},{5,8,0}};
-        return new PuzzleBoard(s);
+
+    private static void test8Puzzle() {
+        System.out.println("=== 测试8-puzzle分离模式数据库 ===");
+
+        int[][] goalBoard3x3 = {
+                {1, 2, 3},
+                {4, 5, 6},
+                {7, 8, 0}
+        };
+
+        int[][] testBoard3x3 = {
+                {0, 1, 3},
+                {4, 2, 6},
+                {7, 5, 8}
+        };
+
+        PuzzleBoard goal3x3 = new PuzzleBoard(goalBoard3x3);
+        PuzzleBoard test3x3 = new PuzzleBoard(testBoard3x3);
+
+        DisjointPatternDatabasePredictor predictor = new DisjointPatternDatabasePredictor();
+        int heuristic = predictor.heuristics(test3x3, goal3x3);
+
+        System.out.println("8-puzzle分离模式数据库启发式值: " + heuristic);
     }
-    private static PuzzleBoard std15() {
-        int[][] g = {{1,2,3,4},{5,6,7,8},{9,10,11,12},{13,14,15,0}};
-        return new PuzzleBoard(g);
-    }
-    private static PuzzleBoard shuffle15() {
-        int[][] s = {{1,2,3,4},{5,6,7,8},{9,10,11,12},{13,0,14,15}};
-        return new PuzzleBoard(s);
+
+    private static void test15Puzzle() {
+        System.out.println("=== 测试15-puzzle分离模式数据库 ===");
+
+        int[][] goalBoard4x4 = {
+                {1, 2, 3, 4},
+                {5, 6, 7, 8},
+                {9, 10, 11, 12},
+                {13, 14, 15, 0}
+        };
+
+        int[][] testBoard4x4 = {
+                {1, 2, 3, 4},
+                {5, 6, 7, 8},
+                {9, 10, 11, 0},
+                {12, 13, 14, 15}
+        };
+
+        PuzzleBoard goal4x4 = new PuzzleBoard(goalBoard4x4);
+        PuzzleBoard test4x4 = new PuzzleBoard(testBoard4x4);
+
+        DisjointPatternDatabasePredictor predictor = new DisjointPatternDatabasePredictor();
+        int heuristic = predictor.heuristics(test4x4, goal4x4);
+
+        System.out.println("15-puzzle分离模式数据库启发式值: " + heuristic);
     }
 }
