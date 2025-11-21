@@ -272,10 +272,10 @@ public class DisjointPatternDatabasePredictor implements Predictor {
 
         PuzzleBoard g3 = std8(), s3 = shuffle8();
         Predictor h = new DisjointPatternDatabasePredictor();
-        System.out.println("8-puzzle (4-4) BFS h = " + h.heuristics(s3, g3));
+        System.out.println("8-puzzle (4-4) BiBFS h = " + h.heuristics(s3, g3));
 
         PuzzleBoard g4 = std15(), s4 = shuffle15();
-        System.out.println("15-puzzle (6-6-3) BFS h = " + h.heuristics(s4, g4));
+        System.out.println("15-puzzle (6-6-3) BiBFS h = " + h.heuristics(s4, g4));
 
         /* 输出总建库耗时 */
         System.out.printf("=== 总建库耗时 %.3f s ===%n", DisjointPatternDatabasePredictor.PDB.totalBuildNs / 1_000_000_000.0);

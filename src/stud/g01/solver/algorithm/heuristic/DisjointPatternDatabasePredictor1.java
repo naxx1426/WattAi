@@ -224,12 +224,12 @@ public class DisjointPatternDatabasePredictor1 implements Predictor {
     /* ===================== ²âÊÔ ======================================== */
     public static void main(String[] args) throws IOException {
 
-        Files.newDirectoryStream(Paths.get(""), "*puzzle-BiBFS-db-*.db")
+        Files.newDirectoryStream(Paths.get(""), "*puzzle-BFS-db-*.db")
                 .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignore) {} });
 
 
         PuzzleBoard g3 = std8(), s3 = shuffle8();
-        Predictor h = new DisjointPatternDatabasePredictor();
+        Predictor h = new DisjointPatternDatabasePredictor1();
         System.out.println("8-puzzle (4-4) BFS h = " + h.heuristics(s3, g3));
 
         PuzzleBoard g4 = std15(), s4 = shuffle15();

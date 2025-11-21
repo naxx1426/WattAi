@@ -4,70 +4,88 @@ import core.problem.State;
 import core.solver.algorithm.heuristic.Predictor;
 import stud.g01.problem.npuzzle.PuzzleBoard;
 
-/**
- * 计算汉明距离启发值
- * 它计算的是当前棋盘上有多少个数字不在其最终的目标位置上
- * @param state 需要被评估的当前状态
- * @param goal  目标状态
- * @return 错位的棋子数量(应该只有这个)
- */
+import java.util.HashMap;
+import java.util.Map;
 
-/**
- * 曼哈顿距离：只考虑数字块，忽略空白
- * 它计算的是每个数字块到其目标位置的横向+纵向距离之和
- */
+
 public class ManhattanDistancePredictor implements Predictor {
 
-    @Override
-    public int heuristics(State state, State goal) {
-        PuzzleBoard curr = (PuzzleBoard) state;
-        PuzzleBoard targ = (PuzzleBoard) goal;
-        int size = curr.getSize();
+    // 缓存，用于存储不同目标状态 (goal state) 的滑块位置查找表
+    private final Map<State, Map<Integer, int[]>> goalCache;
 
-        int dist = 0;
-        // 遍历每个格子
-        for (int r = 0; r < size; r++) {
-            for (int c = 0; c < size; c++) {
-                int num = curr.getGrid()[r][c];
-                if (num == 0) continue;          // 跳过空白
-                int idxTarg = targ.indexOf(num); // 目标线性下标
-                int tr = idxTarg / size;
-                int tc = idxTarg % size;
-                dist += Math.abs(r - tr) + Math.abs(c - tc);
-            }
-        }
-        return dist;
+    /**
+     * 构造实例
+     */
+    public ManhattanDistancePredictor() {
+        this.goalCache = new HashMap<>();
     }
 
-    /* ====================== 内置测试 ====================== */
-    public static void main(String[] args) {
-        /* 初始格局（0 1 2
-         *             3 4 5
-         *             6 7 8） */
-        int[][] start = {
-                {0, 1, 2},
-                {3, 4, 5},
-                {6, 7, 8}
-        };
+    /**
+     * 获取或创建指定目标状态的滑块位置查找表
+     * 如果该目标状态的查找表已被计算过，则从缓存中直接返回，避免重复计算。
+     * @param goal 目标状态
+     * @return 包含所有滑块及其目标位置的查找表
+     */
+    private Map<Integer, int[]> getGoalPositions(State goal) {
+        // 检查缓存中是否已存在该目标状态的查找表
+        if (goalCache.containsKey(goal)) {
+            return goalCache.get(goal);
+        }
 
-        /* 目标格局（1 2 3
-         *             4 5 6
-         *             7 8 0） */
-        int[][] goal = {
-                {1, 2, 3},
-                {4, 5, 6},
-                {7, 8, 0}
-        };
+        // 如果缓存中没有，则为该目标状态创建一个新的查找表
+        Map<Integer, int[]> positions = new HashMap<>();
+        PuzzleBoard goalBoard = (PuzzleBoard) goal;
+        int size = goalBoard.getSize();
+        int[][] goalGrid = goalBoard.getGrid();
 
-        PuzzleBoard startBoard = new PuzzleBoard(start);
-        PuzzleBoard goalBoard = new PuzzleBoard(goal);
+        // 遍历目标棋盘，记录每个滑块 (非 0) 的坐标
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                int value = goalGrid[i][j];
+                if (value != 0) {
+                    positions.put(value, new int[]{i, j});
+                }
+            }
+        }
 
-        ManhattanDistancePredictor predictor = new ManhattanDistancePredictor();
-        int dist = predictor.heuristics(startBoard, goalBoard);
+        // 将新创建的查找表存入缓存，以备后续使用
+        goalCache.put(goal, positions);
+        return positions;
+    }
 
-        System.out.println("计算结果 = " + dist);
-        System.out.println("预期结果 = 12");
-        System.out.println(dist == 12 ? "? 逻辑正确" : "? 逻辑错误");
-        // 放在 main 里计算完后
+    /**
+     * 计算给定状态到目标状态的曼哈顿距离总和
+     * @param state 需要被评估的当前状态
+     * @param goal  目标状态
+     * @return 计算出的曼哈顿距离总和
+     */
+    @Override
+    public int heuristics(State state, State goal) {
+        // 获取目标位置查找表 (此方法会自动处理缓存)
+        Map<Integer, int[]> goalPositions = getGoalPositions(goal);
+
+        PuzzleBoard currentBoard = (PuzzleBoard) state;
+        int[][] currentGrid = currentBoard.getGrid();
+        int size = currentBoard.getSize();
+        int totalDistance = 0;
+
+        // 遍历当前棋盘，累加每个滑块的曼哈顿距离
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                int value = currentGrid[i][j];
+                // 空白格 (0) 不计算距离
+                if (value != 0) {
+                    int[] targetPos = goalPositions.get(value);
+                    // 健壮性检查，防止因输入问题导致程序崩溃
+                    if (targetPos == null) continue;
+
+                    int targetRow = targetPos[0];
+                    int targetCol = targetPos[1];
+                    // 累加当前滑块的曼哈顿距离
+                    totalDistance += Math.abs(i - targetRow) + Math.abs(j - targetCol);
+                }
+            }
+        }
+        return totalDistance;
     }
 }
