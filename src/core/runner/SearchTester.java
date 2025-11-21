@@ -70,11 +70,10 @@ public final class SearchTester {
             //solveProblems方法根据不同启发函数生成不同的searcher
             //从Feeder获取所使用的搜索引擎（AStar，IDAStar等），
 
-
             //!!!!!!!各位一定要看看有没有逻辑问题！！！！！
             switch (step) {
                 case 1://一阶段A*算法
-                    solveProblems(problems, feeder.getAStar(heuristicType),  heuristicType );
+                    solveProblems(problems, feeder.getAStar(heuristicType),  heuristicType);
                     break;
                 case 2://二阶段IDA*算法
                     solveProblems(problems, feeder.getIdaStar(heuristicType), heuristicType);
@@ -147,13 +146,10 @@ public final class SearchTester {
             }
 
             try {
-                // 1. 因为 path 是 Deque<Node>，我们需要提取出里面的 State
                 ArrayList<core.problem.State> stateList = new ArrayList<>();
                 for (Node node : path) {
                     stateList.add(node.getState());
                 }
-                // 2. 调用 PuzzleBoard 里的静态方法写入文件
-                // 注意：需要引入 stud.g01.problem.npuzzle.PuzzleBoard 包
                 stud.g01.problem.npuzzle.PuzzleBoard.saveSolutionToFile(stateList, outputFileName);
                 System.out.println(">> 当前解已追加写入到 " + outputFileName);
             } catch (Exception e) {
